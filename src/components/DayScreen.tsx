@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Pencil, Save, X, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { DayWorkout, Exercise, loadWeekData, saveWeekData, WeekData } from "@/lib/workoutData";
 import ExerciseCard from "@/components/ExerciseCard";
@@ -52,6 +52,40 @@ const DayScreen = ({ dayKey, onBack }: DayScreenProps) => {
     });
   };
 
+  const handleAddExercise = (sectionIdx: number) => {
+    setWeekData((prev) => {
+      const updated = { ...prev };
+      const dayData = { ...updated[dayKey] };
+      const sections = [...dayData.sections];
+      const section = { ...sections[sectionIdx] };
+      const newExercise: Exercise = {
+        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: "Novo exercício",
+        notes: "",
+        gifUrl: "",
+      };
+      section.exercises = [...section.exercises, newExercise];
+      sections[sectionIdx] = section;
+      dayData.sections = sections;
+      updated[dayKey] = dayData;
+      return updated;
+    });
+  };
+
+  const handleRemoveExercise = (sectionIdx: number, exerciseId: string) => {
+    setWeekData((prev) => {
+      const updated = { ...prev };
+      const dayData = { ...updated[dayKey] };
+      const sections = [...dayData.sections];
+      const section = { ...sections[sectionIdx] };
+      section.exercises = section.exercises.filter((ex) => ex.id !== exerciseId);
+      sections[sectionIdx] = section;
+      dayData.sections = sections;
+      updated[dayKey] = dayData;
+      return updated;
+    });
+  };
+
   const handleUpdateSection = (sectionIdx: number, field: "duration" | "description", value: string) => {
     setWeekData((prev) => {
       const updated = { ...prev };
@@ -83,12 +117,23 @@ const DayScreen = ({ dayKey, onBack }: DayScreenProps) => {
     >
       {/* Exercise Detail Overlay */}
       <AnimatePresence>
-        {selectedExercise && (
-          <ExerciseDetail
-            exercise={selectedExercise}
-            onBack={() => setSelectedExercise(null)}
-          />
-        )}
+        {selectedExercise && (() => {
+          const flat = day.sections.flatMap((s) =>
+            s.exercises.map((ex) => ({ ...ex, category: s.title }))
+          );
+          const current = flat.find((e) => e.id === selectedExercise.id) ?? {
+            ...selectedExercise,
+            category: "",
+          };
+          return (
+            <ExerciseDetail
+              exercise={current}
+              exercises={flat}
+              onChange={(ex) => setSelectedExercise(ex)}
+              onBack={() => setSelectedExercise(null)}
+            />
+          );
+        })()}
       </AnimatePresence>
 
       {/* Header */}
@@ -165,15 +210,38 @@ const DayScreen = ({ dayKey, onBack }: DayScreenProps) => {
             </div>
             <div className="space-y-2.5">
               {section.exercises.map((exercise, eIdx) => (
-                <ExerciseCard
-                  key={exercise.id}
-                  exercise={exercise}
-                  index={eIdx}
-                  isEditing={isEditing}
-                  onUpdate={(id, field, value) => handleUpdateExercise(sIdx, id, field, value)}
-                  onTap={() => setSelectedExercise(exercise)}
-                />
+                <div key={exercise.id} className="relative">
+                  <ExerciseCard
+                    exercise={exercise}
+                    index={eIdx}
+                    isEditing={isEditing}
+                    onUpdate={(id, field, value) => handleUpdateExercise(sIdx, id, field, value)}
+                    onTap={() => setSelectedExercise(exercise)}
+                  />
+                  {isEditing && (
+                    <motion.button
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => handleRemoveExercise(sIdx, exercise.id)}
+                      className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg z-10"
+                      aria-label="Remover exercício"
+                    >
+                      <Trash2 size={12} />
+                    </motion.button>
+                  )}
+                </div>
               ))}
+              {isEditing && (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleAddExercise(sIdx)}
+                  className="w-full py-3 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2 text-muted-foreground hover:text-primary"
+                >
+                  <Plus size={16} />
+                  <span className="font-display font-medium text-xs">Adicionar exercício</span>
+                </motion.button>
+              )}
             </div>
           </motion.div>
         ))}
